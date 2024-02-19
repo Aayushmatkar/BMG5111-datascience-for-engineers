@@ -1,0 +1,35 @@
+# main.py
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import tensorflow as tf
+from keras.preprocessing import image
+import numpy as np
+
+app = FastAPI()
+
+# Load the saved model
+model = tf.keras.models.load_model('my_model.h5')
+
+# Define the request payload using Pydantic BaseModel
+class ImagePayload(BaseModel):
+    image_url: str
+
+# Endpoint to make predictions
+@app.post("/predict")
+async def predict_image(payload: ImagePayload):
+    try:
+        # Download and preprocess the image
+        img = image.load_img(payload.image_url, target_size=(150, 150))
+        img_array = image.img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array /= 255.0  # Normalize pixel values to [0, 1]
+
+        # Make predictions using the loaded model
+        prediction = model.predict(img_array)
+        result = 1 if prediction[0][0] > 0.5 else 0
+
+        return {"prediction": result}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
